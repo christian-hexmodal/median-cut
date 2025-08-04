@@ -128,11 +128,18 @@ uploaded_file = st.file_uploader("Choose an image...", type=['jpg', 'jpeg', 'png
 
 if uploaded_file is not None:
     # Display original image
-    image = Image.open(uploaded_file)
+    with st.spinner("📁 Loading image..."):
+        image = Image.open(uploaded_file)
     
     # Sidebar for controls
     with st.sidebar:
         st.header("Controls")
+        
+        # Show original image as reference
+        st.subheader("📸 Original Image")
+        st.image(image, use_container_width=True, caption=f"Size: {image.size[0]}×{image.size[1]} pixels")
+        
+        st.markdown("---")
         
         # Show comparison mode info
         st.info("Showing comparison: Original + 2, 4, 8, 16, 32, 64 colors")
@@ -155,14 +162,26 @@ if uploaded_file is not None:
     palettes = []
     metrics_list = []
     
-    for num_colors in color_counts:
-        depth = int(np.log2(num_colors))
-        quantized_img, palette = median_cut(image, depth)
-        metrics = calculate_quality_metrics(image, quantized_img)
+    # Show loading progress
+    with st.spinner("🔄 Processing image quantization..."):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
         
-        quantized_images.append(quantized_img)
-        palettes.append(palette)
-        metrics_list.append(metrics)
+        for i, num_colors in enumerate(color_counts):
+            status_text.text(f"Processing {num_colors} colors...")
+            progress_bar.progress((i + 1) / len(color_counts))
+            
+            depth = int(np.log2(num_colors))
+            quantized_img, palette = median_cut(image, depth)
+            metrics = calculate_quality_metrics(image, quantized_img)
+            
+            quantized_images.append(quantized_img)
+            palettes.append(palette)
+            metrics_list.append(metrics)
+        
+        status_text.text("✅ Processing complete!")
+        progress_bar.empty()
+        status_text.empty()
     
     # Save to history (using the 8-color version as representative)
     current_state = {
@@ -312,9 +331,11 @@ if uploaded_file is not None:
     with tab2:
         st.write("**Pixel Count per Color:**")
         
-        # Color highlighting feature
-        enable_highlighting = st.checkbox("Enable color highlighting", value=False, 
-                                        help="Highlight colors similar to a chosen color")
+        # Show loading for histogram generation
+        with st.spinner("📊 Generating histogram..."):
+            # Color highlighting feature
+            enable_highlighting = st.checkbox("Enable color highlighting", value=False, 
+                                            help="Highlight colors similar to a chosen color")
         
         target_rgb = None
                 # Define color similarity functions
@@ -511,7 +532,8 @@ if uploaded_file is not None:
     
     with tab3:
         # Generate palette export
-        css_colors, hex_colors = generate_palette_css(palette)
+        with st.spinner("🎨 Preparing palette export..."):
+            css_colors, hex_colors = generate_palette_css(palette)
         
         st.write("**Hex Colors:**")
         for i, hex_color in enumerate(hex_colors):
@@ -555,7 +577,8 @@ if uploaded_file is not None:
         st.info(f"📊 Selected: **{export_color_count} colors** - MSE: {export_metrics['mse']:.2f}, PSNR: {export_metrics['psnr']:.2f} dB, SSIM: {export_metrics['ssim']:.3f}")
         
         # Create comprehensive report with images
-        report = f"""Color Quantization Report
+        with st.spinner("📄 Generating reports..."):
+            report = f"""Color Quantization Report
 Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 Original Image: {image.size[0]}x{image.size[1]}
 
